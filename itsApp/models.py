@@ -7,13 +7,13 @@ class User(AbstractUser):
 class Contributor(models.Model):
 
     PERMISSION = (
-        ('ok', 'Ok'),
-        ('pas ok', 'Pas Ok'),
+        ('authorized', 'Authorized'),
+        ('unauthorized', 'Unauthorized'),
     )
 
     user = models.ForeignKey('User', on_delete=models.CASCADE)
     project = models.ForeignKey('Project', on_delete=models.CASCADE)
-    permission = models.CharField(max_length=10, choices=PERMISSION)
+    permission = models.CharField(max_length=15, choices=PERMISSION)
     role = models.CharField(max_length=50)
 
     def __str__(self):

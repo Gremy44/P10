@@ -12,7 +12,6 @@ from django.shortcuts import get_object_or_404
 from .models import User, Project, Contributor
 from .serializers import UserSerializer, ProjectSerializer, ContributorSerializer
 from .permissions import IsAdminAuthenticated, IsAuthorAuthenticated
-import permissions
 
 class UsersViewset(ReadOnlyModelViewSet):
     """ 
@@ -49,16 +48,19 @@ class ProjectViewset(ModelViewSet):
     permission_classes = [IsAuthenticated,]
     queryset = Project.objects.all()
 
-    def list(self, request, client_pk=None):
-        queryset = Project.objects.filter(client=client_pk)
+    def list(self, request,):
+        queryset = Project.objects.filter()
         serializer = ProjectSerializer(queryset, many=True)
         return Response(serializer.data)
 
-    def retrieve(self, request, pk=None, client_pk=None):
-        queryset = Project.objects.filter(pk=pk, client=client_pk)
+    def retrieve(self, request, pk=None):
+        queryset =Project.objects.filter()
         project = get_object_or_404(queryset, pk=pk)
         serializer = ProjectSerializer(project)
         return Response(serializer.data)
+
+    def get_queryset(self):
+        return Project.objects.all()
 
     @action(methods=['post'], detail=True, permission_classes=[IsAuthenticated])
     def create_project(self, request):
@@ -74,30 +76,32 @@ class ProjectViewset(ModelViewSet):
 
     @action(methods=['put', 'delete'], detail=True, permission_classes=[IsAuthenticated])
     def get_project(self, request):
-        print("coucou")
-        serializer = ProjectSerializer(object)
+        project = Project.objects.all()
+        serializer = ProjectSerializer(project, data=request.data)
         return Response(serializer.data)
 
 class ContributorsViewset(ModelViewSet):
 
     serializer_class = ContributorSerializer
-    queryset = Contributor.objects.all()
-    permission_classes = (permissions.AllowAny,)
+    permission_classes = [IsAuthenticated,]
+    project = Project.objects.all()
 
-    def list(self, request, client_pk=None):
-        queryset = Contributor.objects.filter(client=client_pk)
+    def list(self, request, project_pk=None):
+        queryset = Contributor.objects.filter(project=project_pk)
         serializer = ContributorSerializer(queryset, many=True)
         return Response(serializer.data)
 
-    def retrieve(self, request, pk=None, client_pk=None):
-        queryset = Contributor.objects.filter(pk=pk, client=client_pk)
+    def retrieve(self, request, pk=None, project_pk=None):
+        queryset = Contributor.objects.filter(pk=pk, project=project_pk)
         contributor = get_object_or_404(queryset, pk=pk)
         serializer = ContributorSerializer(contributor)
         return Response(serializer.data)
 
-    @action(methods=['post'], detail=True, permission_classes=[IsAuthenticated])
-    def create_contributor(self, request):
-        print('coucou : ', request)
+    def get_queryset(self):
+        return Contributor.objects.all()
+
+    @action(methods=['post'], detail=True)
+    def create_contributor(self, request, project_id=None):
         serializer = ContributorSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()

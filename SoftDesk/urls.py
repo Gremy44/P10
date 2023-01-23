@@ -21,21 +21,31 @@ from itsApp.views import SignupViewset, UsersViewset, ProjectViewset, Contributo
 from rest_framework_nested import routers
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-router = routers.SimpleRouter()
+router = routers.DefaultRouter()
+
 router.register(r'getuser', UsersViewset, basename='getuser')
 router.register(r'signup', SignupViewset, basename='signup')
+
 router.register(r'projects', ProjectViewset, basename='projects')
 
-project_router = routers.NestedDefaultRouter(router, r'projects', lookup='project')
-project_router.register(r'users', ContributorsViewset, basename='project-users')
+contributor_router = routers.NestedSimpleRouter(router, r'projects', lookup='project')
+contributor_router.register(r'users', ContributorsViewset, basename='users')
+
+# issue_router = routers.NestedDefaultRouter(router, r'projects', lookup='project')
+# issue_router.register(r'issues', IssueViewset, basename='issues')
+
+# comment_router = routers.NestedDefaultRouter(router, r'issues', lookup='issue')
+# comment_router.register(r'comments', CommentViewset, basename='comments')
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('api-auth/', include('rest_framework.urls')),
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('api/', include(router.urls)),
-    path('api/', include(project_router.urls)),
+    path(r'admin/', admin.site.urls),
+    path(r'api-auth/', include('rest_framework.urls')),
+    path(r'api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path(r'api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path(r'api/', include(router.urls)),
+    path(r'api/', include(contributor_router.urls)),
+    # path('api/', include(issue_router.urls)),
+    # path('api/', include(comment_router.urls)),
 ]
 
 if settings.DEBUG:

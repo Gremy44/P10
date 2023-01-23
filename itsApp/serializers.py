@@ -1,5 +1,6 @@
 from rest_framework.serializers import ModelSerializer, HyperlinkedModelSerializer
 from rest_framework import serializers
+from rest_framework_nested.serializers import NestedHyperlinkedModelSerializer
 
 from .models import User, Project, Contributor
 
@@ -34,13 +35,20 @@ class ProjectSerializer(HyperlinkedModelSerializer):
         validated_data['author_user_id'] = self.context['request'].user.id
         return super().create(validated_data)
 
-class ContributorSerializer(HyperlinkedModelSerializer):
+class ContributorSerializer(NestedHyperlinkedModelSerializer):
 
+    parent_lookup_kwargs = {
+        'project_pk': 'project__pk',
+    }
+
+    user_id = serializers.PrimaryKeyRelatedField(read_only=True)
     class Meta:
         model = Contributor
         fields = ['user_id', 'project_id', 'permission', 'role']
 
     def create(self, validated_data):
-        validated_data['project_id'] = self.context['request'].project.id
-        validated_data['user_id'] = self.context['request'].user.id
+        validated_data['project_id'] = self.context['request'].parser_context['kwargs']['project_pk']
         return super().create(validated_data)
+
+class IssuesSerializer(NestedHyperlinkedModelSerializer):
+    pass
