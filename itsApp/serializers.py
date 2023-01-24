@@ -2,7 +2,7 @@ from rest_framework.serializers import ModelSerializer, HyperlinkedModelSerializ
 from rest_framework import serializers
 from rest_framework_nested.serializers import NestedHyperlinkedModelSerializer
 
-from .models import User, Project, Contributor
+from .models import User, Project, Contributor, Issue, Comments
 
 class UserSerializer(HyperlinkedModelSerializer):
 
@@ -23,7 +23,7 @@ class UserSerializer(HyperlinkedModelSerializer):
         return user
 
 
-class ProjectSerializer(HyperlinkedModelSerializer):
+class ProjectSerializer(ModelSerializer):
 
     author_user_id = serializers.PrimaryKeyRelatedField(read_only=True)
 
@@ -35,20 +35,61 @@ class ProjectSerializer(HyperlinkedModelSerializer):
         validated_data['author_user_id'] = self.context['request'].user.id
         return super().create(validated_data)
 
-class ContributorSerializer(NestedHyperlinkedModelSerializer):
+class ContributorSerializer(ModelSerializer):
 
     parent_lookup_kwargs = {
         'project_pk': 'project__pk',
     }
 
-    user_id = serializers.PrimaryKeyRelatedField(read_only=True)
     class Meta:
         model = Contributor
-        fields = ['user_id', 'project_id', 'permission', 'role']
+        fields = ['id', 'user', 'permission', 'role']
 
     def create(self, validated_data):
-        validated_data['project_id'] = self.context['request'].parser_context['kwargs']['project_pk']
+        project_id = self.context['request'].parser_context['kwargs']['project_pk']
+        validated_data['project'] = Project.objects.get(pk=project_id)
         return super().create(validated_data)
 
-class IssuesSerializer(NestedHyperlinkedModelSerializer):
-    pass
+class IssuesSerializer(ModelSerializer):
+
+    parent_lookup_kwargs = {
+        'project_pk': 'project__pk',
+    }
+
+    class Meta:
+        model = Issue
+        fields = ['id', 'title', 'desc', 'tag', 'priority', 'status', 'assignee_user', 'created_time']
+        
+    def create(self, validated_data):
+
+        project_id = self.context['request'].parser_context['kwargs']['project_pk']
+
+        validated_data['created_time'] = serializers.DateTimeField()
+        validated_data['project'] = Project.objects.get(pk=project_id)
+        print('coucou 1 : ', self.context.get("author_user"))
+
+        if self.context.get("author_user") == None:
+            print('coucou 2')
+            validated_data['author_user'] = self.context['request'].user
+
+        return super().create(validated_data)
+
+class CommentsSerializer(ModelSerializer):
+    
+    parent_lookup_kwargs = {
+        'project_pk': 'issue__project__pk',
+        'issue_pk': 'issue__pk',
+    }
+
+    class Meta:
+        model = Comments
+        fields = ['id', 'description']
+
+    def create(self, validated_data):
+        issue_id = self.context['request'].parser_context['kwargs']['issue_pk']
+
+        validated_data['issue'] = Issue.objects.get(pk=issue_id)
+        validated_data['author_user'] = self.context['request'].user
+        validated_data['created_time'] = serializers.DateTimeField()
+
+        return super().create(validated_data)
