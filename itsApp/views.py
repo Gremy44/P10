@@ -9,8 +9,8 @@ from rest_framework.decorators import action
 from django.contrib.auth import login, authenticate, logout, get_user_model
 from django.shortcuts import get_object_or_404
 
-from .models import User, Project, Contributor
-from .serializers import UserSerializer, ProjectSerializer, ContributorSerializer
+from .models import User, Project, Contributor, Issue, Comments
+from .serializers import UserSerializer, ProjectSerializer, ContributorSerializer, IssuesSerializer, CommentsSerializer
 from .permissions import IsAdminAuthenticated, IsAuthorAuthenticated
 
 class UsersViewset(ReadOnlyModelViewSet):
@@ -45,19 +45,6 @@ class ProjectViewset(ModelViewSet):
     """
 
     serializer_class = ProjectSerializer
-    permission_classes = [IsAuthenticated,]
-    queryset = Project.objects.all()
-
-    def list(self, request,):
-        queryset = Project.objects.filter()
-        serializer = ProjectSerializer(queryset, many=True)
-        return Response(serializer.data)
-
-    def retrieve(self, request, pk=None):
-        queryset =Project.objects.filter()
-        project = get_object_or_404(queryset, pk=pk)
-        serializer = ProjectSerializer(project)
-        return Response(serializer.data)
 
     def get_queryset(self):
         return Project.objects.all()
@@ -75,7 +62,7 @@ class ProjectViewset(ModelViewSet):
         return Project.objects.all()
 
     @action(methods=['put', 'delete'], detail=True, permission_classes=[IsAuthenticated])
-    def get_project(self, request):
+    def del_put_project(self, request):
         project = Project.objects.all()
         serializer = ProjectSerializer(project, data=request.data)
         return Response(serializer.data)
@@ -83,24 +70,11 @@ class ProjectViewset(ModelViewSet):
 class ContributorsViewset(ModelViewSet):
 
     serializer_class = ContributorSerializer
-    permission_classes = [IsAuthenticated,]
-    project = Project.objects.all()
-
-    def list(self, request, project_pk=None):
-        queryset = Contributor.objects.filter(project=project_pk)
-        serializer = ContributorSerializer(queryset, many=True)
-        return Response(serializer.data)
-
-    def retrieve(self, request, pk=None, project_pk=None):
-        queryset = Contributor.objects.filter(pk=pk, project=project_pk)
-        contributor = get_object_or_404(queryset, pk=pk)
-        serializer = ContributorSerializer(contributor)
-        return Response(serializer.data)
 
     def get_queryset(self):
         return Contributor.objects.all()
 
-    @action(methods=['post'], detail=True)
+    @action(methods=['post'], detail=True, permission_classes=[IsAuthenticated])
     def create_contributor(self, request, project_id=None):
         serializer = ContributorSerializer(data=request.data)
         if serializer.is_valid():
@@ -111,3 +85,60 @@ class ContributorsViewset(ModelViewSet):
     @action(methods=['get'], detail=True, permission_classes=[IsAuthenticated])
     def get_contributor(self, request):
         return Contributor.objects.all()
+
+    @action(methods=['put', 'delete'], detail=True, permission_classes=[IsAuthenticated])
+    def del_put_contributor(self, request):
+        contributor = Contributor.objects.all()
+        serializer = ContributorSerializer(contributor, data=request.data)
+        return Response(serializer.data)
+
+class IssueViewset(ModelViewSet):
+
+    serializer_class = IssuesSerializer
+
+    def get_queryset(self):
+        return Issue.objects.all()
+
+    @action(methods=['post'], detail=True, permission_classes=[IsAuthenticated])
+    def create_issue(self, request, project_id=None):
+        serializer = IssuesSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=True, permission_classes=[IsAuthenticated])
+    def get_issues(self, request):
+        return Issue.objects.all()
+
+    @action(methods=['put', 'delete'], detail=True, permission_classes=[IsAuthenticated])
+    def del_put_contributor(self, request):
+        issue = Issue.objects.all()
+        serializer = IssuesSerializer(issue, data=request.data)
+        return Response(serializer.data)
+
+
+class CommentViewset(ModelViewSet):
+    
+    serializer_class = CommentsSerializer
+
+    def get_queryset(self):
+        return Comments.objects.all()
+
+    @action(methods=['post'], detail=True, permission_classes=[IsAuthenticated])
+    def create_comment(self, request, project_id=None):
+        serializer = CommentsSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=True, permission_classes=[IsAuthenticated])
+    def get_comments(self, request):
+        return Comments.objects.all()
+
+    @action(methods=['put', 'delete'], detail=True, permission_classes=[IsAuthenticated])
+    def del_put_contributor(self, request):
+        comment = Comments.objects.all()
+        serializer = CommentsSerializer(comment, data=request.data)
+        return Response(serializer.data)

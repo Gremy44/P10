@@ -16,7 +16,7 @@ Including another URLconf
 from django.contrib import admin
 from django.conf import settings
 from django.urls import path, include
-from itsApp.views import SignupViewset, UsersViewset, ProjectViewset, ContributorsViewset
+from itsApp.views import SignupViewset, UsersViewset, ProjectViewset, ContributorsViewset, IssueViewset, CommentViewset
 
 from rest_framework_nested import routers
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -27,15 +27,27 @@ router.register(r'getuser', UsersViewset, basename='getuser')
 router.register(r'signup', SignupViewset, basename='signup')
 
 router.register(r'projects', ProjectViewset, basename='projects')
+## generates:
+# /projects/
+# /projects/{pk}/
 
 contributor_router = routers.NestedSimpleRouter(router, r'projects', lookup='project')
 contributor_router.register(r'users', ContributorsViewset, basename='users')
+## generates:
+# /projects/{project_pk}/users/
+# /projects/{project_pk}/users/{pk}/
 
-# issue_router = routers.NestedDefaultRouter(router, r'projects', lookup='project')
-# issue_router.register(r'issues', IssueViewset, basename='issues')
+issue_router = routers.NestedSimpleRouter(router, r'projects', lookup='project')
+issue_router.register(r'issues', IssueViewset, basename='issues')
+## generates:
+# /projects/{project_pk}/issues/
+# /projects/{project_pk}/issues/{pk}/
 
-# comment_router = routers.NestedDefaultRouter(router, r'issues', lookup='issue')
-# comment_router.register(r'comments', CommentViewset, basename='comments')
+comment_router = routers.NestedSimpleRouter(issue_router, r'issues', lookup='issue')
+comment_router.register(r'comments', CommentViewset, basename='comments')
+## generates:
+# /projects/{project_pk}/issues{issue_pk}/comments
+# /projects/{project_pk}/issues{issue_pk}/comments/{pk}/
 
 urlpatterns = [
     path(r'admin/', admin.site.urls),
@@ -44,8 +56,8 @@ urlpatterns = [
     path(r'api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path(r'api/', include(router.urls)),
     path(r'api/', include(contributor_router.urls)),
-    # path('api/', include(issue_router.urls)),
-    # path('api/', include(comment_router.urls)),
+    path(r'api/', include(issue_router.urls)),
+    path(r'api/', include(comment_router.urls)),
 ]
 
 if settings.DEBUG:
