@@ -1,7 +1,7 @@
 from rest_framework.serializers import ModelSerializer, HyperlinkedModelSerializer
 from rest_framework import serializers
 from rest_framework_nested.serializers import NestedHyperlinkedModelSerializer
-
+from rest_framework.exceptions import ValidationError
 from .models import User, Project, Contributor, Issue, Comments
 
 class UserSerializer(HyperlinkedModelSerializer):
@@ -24,7 +24,6 @@ class UserSerializer(HyperlinkedModelSerializer):
 
 
 class ProjectSerializer(ModelSerializer):
-
     author_user_id = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
@@ -35,20 +34,25 @@ class ProjectSerializer(ModelSerializer):
         validated_data['author_user_id'] = self.context['request'].user.id
         return super().create(validated_data)
 
+
 class ContributorSerializer(ModelSerializer):
+
+    project = serializers.PrimaryKeyRelatedField(read_only=True)
+    # user = UserSerializer(required=False)
 
     parent_lookup_kwargs = {
         'project_pk': 'project__pk',
     }
-
+    
     class Meta:
         model = Contributor
-        fields = ['id', 'user', 'permission', 'role']
+        fields = ['id', 'project', 'user', 'permission', 'role']
 
     def create(self, validated_data):
         project_id = self.context['request'].parser_context['kwargs']['project_pk']
         validated_data['project'] = Project.objects.get(pk=project_id)
         return super().create(validated_data)
+
 
 class IssuesSerializer(ModelSerializer):
 
@@ -56,21 +60,47 @@ class IssuesSerializer(ModelSerializer):
         'project_pk': 'project__pk',
     }
 
+    assignee_user = UserSerializer(required=False)
+    assignee_user_id = serializers.IntegerField(required=False)
+    
     class Meta:
         model = Issue
-        fields = ['id', 'title', 'desc', 'tag', 'priority', 'status', 'assignee_user', 'created_time']
+        fields = ['id', 'title', 'desc', 'tag', 'priority', 'assignee_user','assignee_user_id', 'status', 'created_time']
         
     def create(self, validated_data):
 
+        # contributor_list = []
+        # validation_list = []
+
         project_id = self.context['request'].parser_context['kwargs']['project_pk']
+        # check if user assignee is in contibutors
+        # contributors = Contributor.objects.filter(project=project_id)
+
+        '''for n in contributors.values_list():
+            contributor_list.append(n[1])
+
+        for i in contributor_list:
+            if i == User.objects.get(pk=validated_data['assignee_user_id']).id:
+                validation_list.append(True)
+            else: 
+                validation_list.append(False)
+
+        if any(validation_list):
+            print('ok')
+        else:
+            raise ValidationError({"message": "Assignee user isn't contributor"})'''
+
+        print('Validate data : ', validated_data)
+        
 
         validated_data['created_time'] = serializers.DateTimeField()
         validated_data['project'] = Project.objects.get(pk=project_id)
-        print('coucou 1 : ', self.context.get("author_user"))
+        validated_data['author_user']= self.context['request'].user
 
-        if self.context.get("author_user") == None:
-            print('coucou 2')
-            validated_data['author_user'] = self.context['request'].user
+        if self.context.get("assignee_user_id") == None:
+            validated_data['assignee_user'] = self.context['request'].user
+        else:
+            validated_data['assignee_user'] = User.objects.get(pk=validated_data['assignee_user_id'])
 
         return super().create(validated_data)
 

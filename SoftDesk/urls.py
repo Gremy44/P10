@@ -16,7 +16,7 @@ Including another URLconf
 from django.contrib import admin
 from django.conf import settings
 from django.urls import path, include
-from itsApp.views import SignupViewset, UsersViewset, ProjectViewset, ContributorsViewset, IssueViewset, CommentViewset
+from itsApp.views import SignupViewset, UsersViewset, ActualUserView, ProjectViewset, ContributorsViewset, IssueViewset, CommentViewset
 
 from rest_framework_nested import routers
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -24,6 +24,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 router = routers.DefaultRouter()
 
 router.register(r'getuser', UsersViewset, basename='getuser')
+router.register(r'actual-user', ActualUserView, basename='actual-user')
 router.register(r'signup', SignupViewset, basename='signup')
 
 router.register(r'projects', ProjectViewset, basename='projects')
