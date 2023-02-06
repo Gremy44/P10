@@ -33,9 +33,28 @@ class IsAuthorProject(BasePermission):
         return (bool(request.user == obj.author_user))
 
 class IsAuthorProjectContributor(BasePermission):
+    def has_permission(self, request, view):
+        project_id = request.resolver_match.kwargs.get('project_pk')
+        project = Project.objects.get(pk=project_id)
+        if request.user == project.author_user:
+            is_author=True
+        else:
+            is_author=False
+        return is_author
+
     def has_object_permission(self, request, view, obj):
-        is_author = Project.objects.filter(author_user=request.user).count()
-        return bool(is_author>0)
+        if request.user == obj.author_user:
+            is_author=True
+        else:
+            is_author=False
+        return is_author
+
+class IsAuthorOrContributorContributor(BasePermission):
+    def has_permission(self, request, view):
+        project_id = request.resolver_match.kwargs.get('project_pk')
+        project = Project.objects.get(pk=project_id)
+        is_contributor = Contributor.objects.filter(user=request.user, project__id=project_id).count()
+        return (request.user == project.author_user) or (is_contributor > 0)
 
 class IsAuthorOrContributorIssue(BasePermission):
     def has_permission(self, request, view):
@@ -45,7 +64,7 @@ class IsAuthorOrContributorIssue(BasePermission):
         return (request.user == project.author_user) or (is_contributor > 0)
 
     def has_object_permission(self, request, view, obj):
-        is_contributor = Contributor.objects.filter(user=request.user, project=obj).count()
+        is_contributor = Contributor.objects.filter(user=request.user, project=obj.project).count()
         return (request.user == obj.author_user) or (is_contributor > 0)
 
 
@@ -67,5 +86,5 @@ class IsAuthorOrContributorComment(BasePermission):
         return (request.user == project.author_user) or (is_contributor > 0)
 
     def has_object_permission(self, request, view, obj):
-        is_contributor = Contributor.objects.filter(user=request.user, project=obj).count()
+        is_contributor = Contributor.objects.filter(user=request.user, project=obj.issue.project).count()
         return (request.user == obj.author_user) or (is_contributor > 0)

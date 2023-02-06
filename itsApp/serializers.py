@@ -68,39 +68,22 @@ class IssuesSerializer(ModelSerializer):
         fields = ['id', 'title', 'desc', 'tag', 'priority', 'assignee_user','assignee_user_id', 'status', 'created_time']
         
     def create(self, validated_data):
-
-        # contributor_list = []
-        # validation_list = []
-
-        project_id = self.context['request'].parser_context['kwargs']['project_pk']
-        # check if user assignee is in contibutors
-        # contributors = Contributor.objects.filter(project=project_id)
-
-        '''for n in contributors.values_list():
-            contributor_list.append(n[1])
-
-        for i in contributor_list:
-            if i == User.objects.get(pk=validated_data['assignee_user_id']).id:
-                validation_list.append(True)
-            else: 
-                validation_list.append(False)
-
-        if any(validation_list):
-            print('ok')
-        else:
-            raise ValidationError({"message": "Assignee user isn't contributor"})'''
-
-        print('Validate data : ', validated_data)
-        
+        project_id = self.context['view'].kwargs['project_pk']
+        project = Project.objects.get(pk=project_id)
+        request = self.context['request']
+        user = request.user
 
         validated_data['created_time'] = serializers.DateTimeField()
-        validated_data['project'] = Project.objects.get(pk=project_id)
-        validated_data['author_user']= self.context['request'].user
+        validated_data['project'] = project
+        validated_data['author_user'] = user
 
-        if self.context.get("assignee_user_id") == None:
-            validated_data['assignee_user'] = self.context['request'].user
+        assignee_user_id = validated_data.pop('assignee_user_id', None)
+
+        if assignee_user_id:
+            assignee_user = User.objects.get(pk=assignee_user_id)
+            validated_data['assignee_user'] = assignee_user
         else:
-            validated_data['assignee_user'] = User.objects.get(pk=validated_data['assignee_user_id'])
+            validated_data['assignee_user'] = user
 
         return super().create(validated_data)
 

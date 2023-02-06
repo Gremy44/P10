@@ -1,5 +1,5 @@
 from django.shortcuts import render
-
+from django.http import Http404
 from rest_framework.permissions import SAFE_METHODS
 from rest_framework import generics, status
 from rest_framework.views import APIView
@@ -15,7 +15,7 @@ from django.db.models import Q
 
 from .models import User, Project, Contributor, Issue, Comments
 from .serializers import UserSerializer, ProjectSerializer, ContributorSerializer, IssuesSerializer, CommentsSerializer
-from .permissions import IsAuthorOrContributorProject, IsAuthorProject, IsAuthorProjectContributor, IsAuthorOrContributorIssue, IsAuthorIssue, IsAuthorComment, IsAuthorOrContributorComment
+from .permissions import IsAuthorOrContributorProject, IsAuthorProject, IsAuthorProjectContributor, IsAuthorOrContributorContributor, IsAuthorOrContributorIssue, IsAuthorIssue, IsAuthorComment, IsAuthorOrContributorComment, IsAdminAuthenticated
 
 
 class UsersViewset(ReadOnlyModelViewSet):
@@ -55,157 +55,247 @@ class SignupViewset(ModelViewSet):
 
 
 class ProjectViewset(ModelViewSet):
-    """
-    GET/id : get the project with id  
-    POST : create new project 
-    """
 
     serializer_class = ProjectSerializer
+    queryset = Project.objects.all()
 
     def get_permissions(self):
         """
         Instantiates and returns the list of permissions that this view requires.
         """
         if self.action in SAFE_METHODS:
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorProject]
-        elif self.action == 'post':
             permission_classes = [IsAuthenticated]
+        elif self.action == 'list':
+            permission_classes = [IsAuthenticated]
+        elif self.action == 'retrieve':
+            permission_classes = [IsAuthenticated & IsAuthorOrContributorProject]
+        elif self.action == 'create':
+            permission_classes = [IsAuthenticated & IsAuthorOrContributorProject]
+        elif self.action == 'update':
+            permission_classes = [IsAuthenticated & IsAuthorProject]
+        elif self.action == 'partial_update':
+            permission_classes = [IsAuthenticated & IsAuthorProject]
+        elif self.action == 'destroy':
+            permission_classes = [IsAuthenticated & IsAuthorProject]
         else:
-            permission_classes=[IsAuthenticated & IsAuthorProject]
+            permission_classes=[IsAuthenticated & IsAdminAuthenticated]
         return [permission() for permission in permission_classes]
 
-    def get_queryset(self):
-        return Project.objects.filter(author_user = self.request.user)
+    # returns all projects which you are the author or contributor
+    def list(self, request, *args, **kwargs):
+        queryset = Project.objects.filter(Q(author_user = self.request.user) | Q(contributor__user = self.request.user)).distinct()
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @action(methods=['post'], detail=True)
-    def create_project(self, request):
-        serializer = ProjectSerializer(data=request.data)
+    # create new project
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            self.perform_create(serializer)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['put', 'patch', 'delete'], detail=True)
-    def del_put_project(self, request):
-        project = Project.objects.all()
-        serializer = ProjectSerializer(project, data=request.data)
+    # return project with id
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
+    # update all data
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=False)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+    # update selected data
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+    # delete project
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        data = {'message': 'ID delete'}
+        return Response(data, status=204)
 
 
 class ContributorsViewset(ModelViewSet):
 
     serializer_class = ContributorSerializer
+    queryset = Contributor.objects.all()
 
     def get_permissions(self):
         """
         Instantiates and returns the list of permissions that this view requires.
         """
         if self.action in SAFE_METHODS:
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorProject]
-        elif self.action == 'post':
+            permission_classes = [IsAuthenticated & IsAuthorOrContributorContributor]
+        elif self.action == 'list':
+            permission_classes = [IsAuthenticated & IsAuthorOrContributorContributor]
+        elif self.action == 'retrieve':
+            permission_classes = [IsAuthenticated & IsAuthorOrContributorContributor]
+        elif self.action == 'create':
+            permission_classes = [IsAuthenticated & IsAuthorProjectContributor]
+        elif self.action == 'update':
+            permission_classes = [IsAuthenticated & IsAuthorProjectContributor]
+        elif self.action == 'partial_update':
+            permission_classes = [IsAuthenticated & IsAuthorProjectContributor]
+        elif self.action == 'destroy':
             permission_classes = [IsAuthenticated & IsAuthorProjectContributor]
         else:
-            permission_classes=[IsAuthenticated & IsAuthorProjectContributor]
+            permission_classes=[IsAuthenticated & IsAdminAuthenticated]
         return [permission() for permission in permission_classes]
 
-    def get_queryset(self):
+    def list(self, request, *args, **kwargs):
         project_id = self.request.resolver_match.kwargs.get('project_pk')
-        return Contributor.objects.filter(project = project_id)
+        queryset = Contributor.objects.filter(project = project_id)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @action(methods=['post'], detail=True)
-    def create_contributor(self, request, project_id=None):
-        serializer = ContributorSerializer(data=request.data)
+    def create(self, request, *args, **kwargs):
+        project_author = Project.objects.filter(author_user=self.request.user).count()
+        serializer = self.get_serializer(data=request.data)
+        print(project_author)
         if serializer.is_valid():
-            serializer.save()
+            self.perform_create(serializer)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['put', 'patch', 'delete'], detail=True)
-    def del_put_contributor(self, request):
-        contributor = Contributor.objects.all()
-        serializer = ContributorSerializer(contributor, data=request.data)
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=False)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        data = {'message': 'ID delete'}
+        return Response(data, status=204)
 
 
 class IssueViewset(ModelViewSet):
 
+    queryset = Issue.objects.all()
     serializer_class = IssuesSerializer
-
+    
     def get_permissions(self):
         """
         Instantiates and returns the list of permissions that this view requires.
         """
         if self.action in SAFE_METHODS:
             permission_classes = [IsAuthenticated & IsAuthorOrContributorIssue]
-        elif self.action == 'post':
+        elif self.action == 'list':
             permission_classes = [IsAuthenticated & IsAuthorOrContributorIssue]
+        elif self.action == 'retrieve':
+            permission_classes = [IsAuthenticated & IsAuthorOrContributorIssue]
+        elif self.action == 'create':
+            permission_classes = [IsAuthenticated & IsAuthorOrContributorIssue]
+        elif self.action == 'update':
+            permission_classes = [IsAuthenticated & IsAuthorIssue]
+        elif self.action == 'partial_update':
+            permission_classes = [IsAuthenticated & IsAuthorIssue]
+        elif self.action == 'destroy':
+            permission_classes = [IsAuthenticated & IsAuthorIssue]
         else:
-            permission_classes=[IsAuthenticated & IsAuthorIssue]
+            permission_classes=[IsAuthenticated & IsAdminAuthenticated]
         return [permission() for permission in permission_classes]
 
-    def get_queryset(self):
+    def list(self, request, *args, **kwargs):
         project_id = self.request.resolver_match.kwargs.get('project_pk')
-        return Issue.objects.filter(project__id = project_id).order_by('-created_time')
+        queryset = Issue.objects.filter(project__id = project_id).order_by('-created_time')
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def check_contributor(self, request):
-        contributor_list = []
-        validation_list = []
-
-        project_id = self.request.resolver_match.kwargs.get('project_pk')
-        contributors = Contributor.objects.filter(project=project_id)
-
-        '''for i in contributors:
-            if serializer.data'''
-
-        '''for n in contributors.values_list():
-            contributor_list.append(n[1])
-
-        for i in contributor_list:
-            if i == User.objects.get(pk=request.data):
-                validation_list.append(True)
-            else: 
-                validation_list.append(False)
-
-        if any(validation_list):
-            print('ok')
-        else:
-            raise ValidationError({"message": "Assignee user isn't contributor"})'''
-
-    @action(methods=['post'], detail=True)
-    def create_issue(self, request, pk=None):
-        serializer = IssuesSerializer(data=request.data)
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            validation_list = []
-            project_id = self.request.resolver_match.kwargs.get('project_pk')
-            contributors = Contributor.objects.filter(project=project_id)
-            
-            for i in contributors:
-                if serializer.data.get('assignee_user_id') == i:
-                    validation_list.append(True)
-                else:
-                    validation_list.append(False)
-                    
-            if any(validation_list):
-                print('ok')
-            else:
-                raise ValidationError({"message": "Assignee user isn't contributor"})
-
-            serializer.save()
+            self.perform_create(serializer)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['put', 'patch', 'delete'], detail=False)
-    def del_put_contributor(self, request):
-        issue = Issue.objects.all()
-        serializer = IssuesSerializer(issue, data=request.data)
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=False)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        data = {'message': 'ID delete'}
+        return Response(data, status=204)
 
 
 class CommentViewset(ModelViewSet):
 
     serializer_class = CommentsSerializer
+    queryset = Comments.objects.all()
 
     def get_permissions(self):
+        """
+        Instantiates and returns the list of permissions that this view requires.
+        """
+        if self.action in SAFE_METHODS:
+            permission_classes = [IsAuthenticated & IsAuthorOrContributorComment]
+        elif self.action == 'list':
+            permission_classes = [IsAuthenticated & IsAuthorOrContributorComment]
+        elif self.action == 'retrieve':
+            permission_classes = [IsAuthenticated & IsAuthorOrContributorComment]
+        elif self.action == 'create':
+            permission_classes = [IsAuthenticated & IsAuthorOrContributorComment]
+        elif self.action == 'update':
+            permission_classes = [IsAuthenticated & IsAuthorOrContributorComment]
+        elif self.action == 'partial_update':
+            permission_classes = [IsAuthenticated & IsAuthorOrContributorComment]
+        elif self.action == 'destroy':
+            permission_classes = [IsAuthenticated & IsAuthorOrContributorComment]
+        else:
+            permission_classes=[IsAuthenticated & IsAdminAuthenticated]
+        return [permission() for permission in permission_classes]
+
+    '''def get_permissions(self):
         """
         Instantiates and returns the list of permissions that this view requires.
         """
@@ -216,23 +306,44 @@ class CommentViewset(ModelViewSet):
         else:
             permission_classes=[IsAuthenticated & IsAuthorComment]
         return [permission() for permission in permission_classes]
-
-    def get_queryset(self):
-        project_id = self.request.resolver_match.kwargs.get('project_pk')
+'''
+    def list(self, request, *args, **kwargs):
         issue_id = self.request.resolver_match.kwargs.get('issue_pk')
+        queryset = Comments.objects.filter(issue__id = issue_id).order_by('-created_time')
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-        return Comments.objects.filter(issue__id = issue_id).order_by('-created_time')
-
-    @action(methods=['post'], detail=True)
-    def create_comment(self, request, project_id=None):
-        serializer = CommentsSerializer(data=request.data)
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            self.perform_create(serializer)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['put', 'patch', 'delete'], detail=True)
-    def del_put_contributor(self, request):
-        comment = Comments.objects.all()
-        serializer = CommentsSerializer(comment, data=request.data)
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=False)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        data = {'message': 'ID delete'}
+        return Response(data, status=204)
