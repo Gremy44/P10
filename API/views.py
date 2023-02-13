@@ -15,7 +15,7 @@ from django.db.models import Q
 
 from .models import User, Project, Contributor, Issue, Comments
 from .serializers import UserSerializer, ProjectSerializer, ContributorSerializer, IssuesSerializer, CommentsSerializer
-from .permissions import IsAuthorOrContributorProject, IsAuthorProject, IsAuthorProjectContributor, IsAuthorOrContributorContributor, IsAuthorOrContributorIssue, IsAuthorIssue, IsAuthorComment, IsAuthorOrContributorComment, IsAdminAuthenticated
+from .permissions import IsAdminAuthenticated, IsProjectAuthor, IsContributor, IsIssueAuthor, IsCommentAuthor
 
 
 class UsersViewset(ReadOnlyModelViewSet):
@@ -56,6 +56,7 @@ class SignupViewset(ModelViewSet):
 
 class ProjectViewset(ModelViewSet):
 
+    # Serializer and queryset
     serializer_class = ProjectSerializer
     queryset = Project.objects.all()
 
@@ -63,20 +64,10 @@ class ProjectViewset(ModelViewSet):
         """
         Instantiates and returns the list of permissions that this view requires.
         """
-        if self.action in SAFE_METHODS:
+        if self.action in ['list', 'create',]:
             permission_classes = [IsAuthenticated]
-        elif self.action == 'list':
-            permission_classes = [IsAuthenticated]
-        elif self.action == 'retrieve':
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorProject]
-        elif self.action == 'create':
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorProject]
-        elif self.action == 'update':
-            permission_classes = [IsAuthenticated & IsAuthorProject]
-        elif self.action == 'partial_update':
-            permission_classes = [IsAuthenticated & IsAuthorProject]
-        elif self.action == 'destroy':
-            permission_classes = [IsAuthenticated & IsAuthorProject]
+        elif self.action in ['retrieve', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsAuthenticated & (IsProjectAuthor | IsContributor)]
         else:
             permission_classes=[IsAuthenticated & IsAdminAuthenticated]
         return [permission() for permission in permission_classes]
@@ -130,6 +121,7 @@ class ProjectViewset(ModelViewSet):
 
 class ContributorsViewset(ModelViewSet):
 
+    # Serializer and queryset
     serializer_class = ContributorSerializer
     queryset = Contributor.objects.all()
 
@@ -137,20 +129,10 @@ class ContributorsViewset(ModelViewSet):
         """
         Instantiates and returns the list of permissions that this view requires.
         """
-        if self.action in SAFE_METHODS:
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorContributor]
-        elif self.action == 'list':
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorContributor]
-        elif self.action == 'retrieve':
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorContributor]
-        elif self.action == 'create':
-            permission_classes = [IsAuthenticated & IsAuthorProjectContributor]
-        elif self.action == 'update':
-            permission_classes = [IsAuthenticated & IsAuthorProjectContributor]
-        elif self.action == 'partial_update':
-            permission_classes = [IsAuthenticated & IsAuthorProjectContributor]
-        elif self.action == 'destroy':
-            permission_classes = [IsAuthenticated & IsAuthorProjectContributor]
+        if self.action in ['list', 'retrieve',]:
+            permission_classes = [IsAuthenticated & (IsProjectAuthor | IsContributor)]
+        elif self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsAuthenticated & IsProjectAuthor]
         else:
             permission_classes=[IsAuthenticated & IsAdminAuthenticated]
         return [permission() for permission in permission_classes]
@@ -201,6 +183,7 @@ class ContributorsViewset(ModelViewSet):
 
 class IssueViewset(ModelViewSet):
 
+    # Serializer and queryset
     queryset = Issue.objects.all()
     serializer_class = IssuesSerializer
     
@@ -208,20 +191,10 @@ class IssueViewset(ModelViewSet):
         """
         Instantiates and returns the list of permissions that this view requires.
         """
-        if self.action in SAFE_METHODS:
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorIssue]
-        elif self.action == 'list':
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorIssue]
-        elif self.action == 'retrieve':
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorIssue]
-        elif self.action == 'create':
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorIssue]
-        elif self.action == 'update':
-            permission_classes = [IsAuthenticated & IsAuthorIssue]
-        elif self.action == 'partial_update':
-            permission_classes = [IsAuthenticated & IsAuthorIssue]
-        elif self.action == 'destroy':
-            permission_classes = [IsAuthenticated & IsAuthorIssue]
+        if self.action in ['list', 'retrieve', 'create',]:
+            permission_classes = [IsAuthenticated & (IsProjectAuthor | IsContributor)]
+        elif self.action in ['update', 'partial_update', 'destroy']:
+            permission_classes = [IsAuthenticated & IsIssueAuthor]
         else:
             permission_classes=[IsAuthenticated & IsAdminAuthenticated]
         return [permission() for permission in permission_classes]
@@ -270,6 +243,7 @@ class IssueViewset(ModelViewSet):
 
 class CommentViewset(ModelViewSet):
 
+    # Serializer and queryset
     serializer_class = CommentsSerializer
     queryset = Comments.objects.all()
 
@@ -277,36 +251,14 @@ class CommentViewset(ModelViewSet):
         """
         Instantiates and returns the list of permissions that this view requires.
         """
-        if self.action in SAFE_METHODS:
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorComment]
-        elif self.action == 'list':
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorComment]
-        elif self.action == 'retrieve':
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorComment]
-        elif self.action == 'create':
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorComment]
-        elif self.action == 'update':
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorComment]
-        elif self.action == 'partial_update':
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorComment]
-        elif self.action == 'destroy':
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorComment]
+        if self.action in ['list', 'retrieve', 'create',]:
+            permission_classes = [IsAuthenticated & IsContributor]
+        elif self.action in ['update', 'partial_update', 'destroy']:
+            permission_classes = [IsAuthenticated & IsCommentAuthor]
         else:
             permission_classes=[IsAuthenticated & IsAdminAuthenticated]
         return [permission() for permission in permission_classes]
 
-    '''def get_permissions(self):
-        """
-        Instantiates and returns the list of permissions that this view requires.
-        """
-        if self.action in SAFE_METHODS:
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorComment]
-        elif self.action == 'post':
-            permission_classes = [IsAuthenticated & IsAuthorOrContributorIssue]
-        else:
-            permission_classes=[IsAuthenticated & IsAuthorComment]
-        return [permission() for permission in permission_classes]
-'''
     def list(self, request, *args, **kwargs):
         issue_id = self.request.resolver_match.kwargs.get('issue_pk')
         queryset = Comments.objects.filter(issue__id = issue_id).order_by('-created_time')

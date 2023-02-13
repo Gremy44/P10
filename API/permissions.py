@@ -8,7 +8,7 @@ class IsAdminAuthenticated(BasePermission):
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_authenticated and request.user.is_superuser)
 
-class IsAuthorAuthenticated(BasePermission):
+'''class IsAuthorAuthenticated(BasePermission):
 
     def has_object_permission(self, request, view, obj):
         return obj.author_user == request.user
@@ -43,7 +43,10 @@ class IsAuthorProjectContributor(BasePermission):
         return is_author
 
     def has_object_permission(self, request, view, obj):
-        if request.user == obj.author_user:
+        project_id = request.resolver_match.kwargs.get('project_pk')
+        project = Project.objects.get(pk=project_id)
+
+        if request.user == project.author_user:
             is_author=True
         else:
             is_author=False
@@ -88,3 +91,36 @@ class IsAuthorOrContributorComment(BasePermission):
     def has_object_permission(self, request, view, obj):
         is_contributor = Contributor.objects.filter(user=request.user, project=obj.issue.project).count()
         return (request.user == obj.author_user) or (is_contributor > 0)
+'''
+
+# -----------------------------
+# ---- FINISH PERMISSIONS -----
+# -----------------------------
+class IsProjectAuthor(BasePermission):
+    def has_permission(self, request, view):
+        project = Project.objects.filter(author_user_id=request.user)
+        return bool(project.count()>0)
+
+    def has_object_permission(self, request, view, obj):
+        return bool(request.user == obj.author_user)
+
+class IsContributor(BasePermission):
+
+    def has_permission(self, request, view):
+        project_id = request.resolver_match.kwargs.get('project_pk')
+        is_contributor = Contributor.objects.filter(user=request.user, project__id=project_id).count()
+        return bool(is_contributor > 0)
+
+    def has_object_permission(self, request, view, obj):
+        is_contributor = Contributor.objects.filter(user=request.user, project=obj.project).count()
+        return bool(is_contributor > 0)
+
+class IsIssueAuthor(BasePermission):
+
+    def has_object_permission(self, request, view, obj):
+        return (request.user == obj.author_user)
+
+class IsCommentAuthor(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        return bool(request.user == obj.author_user)
+
