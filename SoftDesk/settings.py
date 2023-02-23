@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'API',
+    'authentication',
 ]
 
 MIDDLEWARE = [
@@ -134,7 +135,7 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # USER
-AUTH_USER_MODEL = 'API.User'
+AUTH_USER_MODEL = 'authentication.User'
 
 # TOKEN
 SIMPLE_JWT = {

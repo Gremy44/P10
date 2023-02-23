@@ -1,12 +1,6 @@
 from django.contrib import admin
-from API.models import User, Contributor, Issue, Project, Comments
+from API.models import Contributor, Issue, Project, Comments
 
-# Register your models here.
-class UserAdmin(admin.ModelAdmin):
-    list_display = ('id', 'first_name', 'last_name', 'username', 'email')
-    list_filter = ('id', 'username')
-
-# admin.site.register(User, UserAdmin)
 
 class ProjectAdmin(admin.ModelAdmin):
     list_display = ('id', 'title', 'description', 'author_user', 'type')
@@ -31,7 +25,7 @@ class CommentsAdmin(admin.ModelAdmin):
 
 # admin.site.register(Comments, CommentsAdmin)
 
-order = [User, Project, Contributor, Issue, Comments]
+order = [Project, Contributor, Issue, Comments]
 
 for model in order:
     admin.site.register(model, locals()[model.__name__+'Admin'])

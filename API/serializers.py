@@ -1,26 +1,7 @@
-from rest_framework.serializers import ModelSerializer, HyperlinkedModelSerializer
+from rest_framework.serializers import ModelSerializer
 from rest_framework import serializers
-from rest_framework_nested.serializers import NestedHyperlinkedModelSerializer
-from rest_framework.exceptions import ValidationError
-from .models import User, Project, Contributor, Issue, Comments
-
-class UserSerializer(HyperlinkedModelSerializer):
-
-    class Meta:
-        model = User
-        fields =['id', 'username', 'first_name', 'last_name', 'email', 'password']
-        extra_kwargs = {'password': {'write_only': True}}
-
-    def create(self, validated_data):
-        user = User(
-            username=validated_data['username'],
-            first_name=validated_data['first_name'],
-            last_name=validated_data['last_name'],
-            email=validated_data['email']
-        )
-        user.set_password(validated_data['password'])
-        user.save()
-        return user
+from .models import Project, Contributor, Issue, Comments
+from authentication.models import User
 
 
 class ProjectSerializer(ModelSerializer):

@@ -16,7 +16,8 @@ Including another URLconf
 from django.contrib import admin
 from django.conf import settings
 from django.urls import path, include
-from API.views import SignupViewset, UsersViewset, ActualUserView, ProjectViewset, ContributorsViewset, IssueViewset, CommentViewset
+from API.views import ProjectViewset, ContributorsViewset, IssueViewset, CommentViewset
+from authentication.views import SignupViewset, UsersViewset, ActualUserView
 
 from rest_framework_nested import routers
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView

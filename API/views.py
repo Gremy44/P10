@@ -1,61 +1,13 @@
-from itertools import chain
-import itertools
-import operator
-
-from django.shortcuts import render
-from django.http import Http404
-from rest_framework.permissions import SAFE_METHODS
-from rest_framework import generics, status
-from rest_framework.views import APIView
-from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
+from rest_framework import status
+from rest_framework.viewsets import ModelViewSet
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
-from django.contrib.auth import login, authenticate, logout, get_user_model
-from django.shortcuts import get_object_or_404
 from django.db.models import Q
 
 
-from .models import User, Project, Contributor, Issue, Comments
-from .serializers import UserSerializer, ProjectSerializer, ContributorSerializer, IssuesSerializer, CommentsSerializer
+from .models import Project, Contributor, Issue, Comments
+from .serializers import ProjectSerializer, ContributorSerializer, IssuesSerializer, CommentsSerializer
 from .permissions import IsAdminAuthenticated, IsProjectAuthor, IsContributor, IsIssueAuthor, IsCommentAuthor, IsValidePkContributor, IsValidePkIssue
-
-
-class UsersViewset(ReadOnlyModelViewSet):
-    """ 
-    GET : get all users in db
-    """
-    serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        return User.objects.all()
-
-class ActualUserView(ModelViewSet):
-
-    queryset = get_user_model().objects.none()
-    serializer_class = UserSerializer
-
-    def list(self, request):
-        user = self.request.user
-        serializer = self.get_serializer(user)
-        return Response(serializer.data)
-
-class SignupViewset(ModelViewSet):
-    """
-    POST : create new user
-    """
-
-    serializer_class = UserSerializer
-
-    @action(methods=['post'], detail=True)
-    def create_user(self, request):
-        serializer = UserSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ProjectViewset(ModelViewSet):
@@ -142,8 +94,11 @@ class ProjectViewset(ModelViewSet):
     # delete project
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        # informations for delete message
+        retour_id = request.resolver_match.kwargs.get('pk')
+        project_name = Project.objects.get(id=retour_id)
+        data = {'message': f'Project {retour_id} : --{project_name.title}-- delete'}
         self.perform_destroy(instance)
-        data = {'message': 'ID delete'}
         return Response(data, status=204)
 
 
@@ -214,8 +169,11 @@ class ContributorsViewset(ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        # informations for delete message
+        retour_id = request.resolver_match.kwargs.get('pk')
+        contributor_name = Contributor.objects.get(id=retour_id)
+        data = {'message': f'Contributor N°:{retour_id} --{contributor_name.user.username}-- remove'}
         self.perform_destroy(instance)
-        data = {'message': 'ID delete'}
         return Response(data, status=204)
 
 
@@ -287,8 +245,11 @@ class IssueViewset(ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        # informations for delete message
+        retour_id = request.resolver_match.kwargs.get('pk')
+        issue_name = Issue.objects.get(id=retour_id)
+        data = {'message': f'Issue N°{retour_id}: --{issue_name.title}-- remove'}
         self.perform_destroy(instance)
-        data = {'message': 'ID delete'}
         return Response(data, status=204)
 
 
@@ -359,6 +320,8 @@ class CommentViewset(ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        retour_id = request.resolver_match.kwargs.get('pk')
+        comment = Comments.objects.get(id=retour_id)
+        data = {'message': f'Comment N°{retour_id}: --{comment.description}-- remove'}
         self.perform_destroy(instance)
-        data = {'message': 'ID delete'}
         return Response(data, status=204)
