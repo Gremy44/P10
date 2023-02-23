@@ -4,6 +4,7 @@ from django.contrib.auth.models import AbstractUser
 class User(AbstractUser):
     pass
 
+
 class Contributor(models.Model):
 
     PERMISSION = (
@@ -11,13 +12,11 @@ class Contributor(models.Model):
         ('unauthorized', 'Unauthorized'),
     )
 
-    user = models.ForeignKey('User', on_delete=models.CASCADE)
-    project = models.ForeignKey('Project', on_delete=models.CASCADE)
+    user = models.ForeignKey('User', on_delete=models.CASCADE, related_name='contributor_user')
+    project = models.ForeignKey('Project', on_delete=models.CASCADE, related_name='contributor_project')
     permission = models.CharField(max_length=15, choices=PERMISSION)
     role = models.CharField(max_length=50)
 
-    def __str__(self):
-        return self.user
 
 class Project(models.Model):
 
@@ -35,6 +34,7 @@ class Project(models.Model):
 
     def __str__(self):
         return self.title
+
 
 class Issue(models.Model):
 
@@ -68,6 +68,7 @@ class Issue(models.Model):
 
     def __str__(self):
         return self.title
+
 
 class Comments(models.Model):
     description = models.CharField(max_length=500)

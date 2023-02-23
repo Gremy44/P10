@@ -1,3 +1,7 @@
+from itertools import chain
+import itertools
+import operator
+
 from django.shortcuts import render
 from django.http import Http404
 from rest_framework.permissions import SAFE_METHODS
@@ -15,7 +19,7 @@ from django.db.models import Q
 
 from .models import User, Project, Contributor, Issue, Comments
 from .serializers import UserSerializer, ProjectSerializer, ContributorSerializer, IssuesSerializer, CommentsSerializer
-from .permissions import IsAdminAuthenticated, IsProjectAuthor, IsContributor, IsIssueAuthor, IsCommentAuthor
+from .permissions import IsAdminAuthenticated, IsProjectAuthor, IsContributor, IsIssueAuthor, IsCommentAuthor, IsValidePkContributor, IsValidePkIssue
 
 
 class UsersViewset(ReadOnlyModelViewSet):
@@ -58,24 +62,48 @@ class ProjectViewset(ModelViewSet):
 
     # Serializer and queryset
     serializer_class = ProjectSerializer
-    queryset = Project.objects.all()
 
     def get_permissions(self):
         """
         Instantiates and returns the list of permissions that this view requires.
         """
-        if self.action in ['list', 'create',]:
+        # Safe method permissions
+        if self.action == 'list':
             permission_classes = [IsAuthenticated]
-        elif self.action in ['retrieve', 'update', 'partial_update', 'destroy']:
+        # Other method permissions
+        elif self.action == 'create':
+            permission_classes = [IsAuthenticated]
+        elif self.action == 'retrieve':
             permission_classes = [IsAuthenticated & (IsProjectAuthor | IsContributor)]
+        elif self.action in ['update', 'partial_update', 'destroy']:
+            permission_classes = [IsAuthenticated & IsProjectAuthor]
         else:
             permission_classes=[IsAuthenticated & IsAdminAuthenticated]
         return [permission() for permission in permission_classes]
 
+    def get_queryset(self):
+        """
+        Returns the queryset used for this view.
+        """
+        if self.action in ['retrieve', 'update', 'partial_update', 'destroy']:
+            # Return only the requested project
+            return Project.objects.filter(id=self.kwargs['pk'])
+        else:
+            # Return all projects
+            return Project.objects.all()
+
     # returns all projects which you are the author or contributor
     def list(self, request, *args, **kwargs):
-        queryset = Project.objects.filter(Q(author_user = self.request.user) | Q(contributor__user = self.request.user)).distinct()
+
+        # if user isn't contributor, effect filter just on project
+        try:
+            contributor = Contributor.objects.get(user=self.request.user)
+            queryset = Project.objects.filter(Q(author_user = self.request.user) | Q(contributor_project = contributor )).distinct()
+        except:
+            queryset = Project.objects.filter(author_user = self.request.user)
+
         page = self.paginate_queryset(queryset)
+
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
@@ -123,33 +151,43 @@ class ContributorsViewset(ModelViewSet):
 
     # Serializer and queryset
     serializer_class = ContributorSerializer
-    queryset = Contributor.objects.all()
 
     def get_permissions(self):
         """
         Instantiates and returns the list of permissions that this view requires.
         """
-        if self.action in ['list', 'retrieve',]:
+        # Safe method permissions
+        if self.action == 'list':
             permission_classes = [IsAuthenticated & (IsProjectAuthor | IsContributor)]
+        # Other method permissions
+        elif  self.action == 'retrieve':
+            permission_classes = [IsAuthenticated & IsValidePkContributor & (IsProjectAuthor | IsContributor)]
         elif self.action in ['create', 'update', 'partial_update', 'destroy']:
-            permission_classes = [IsAuthenticated & IsProjectAuthor]
+            permission_classes = [IsAuthenticated & IsProjectAuthor & IsValidePkContributor]
         else:
             permission_classes=[IsAuthenticated & IsAdminAuthenticated]
         return [permission() for permission in permission_classes]
 
+    def get_queryset(self):
+        """
+        Returns the queryset used for this view.
+        """
+        if self.action in ['retrieve', 'update', 'partial_update', 'destroy']:
+            return Contributor.objects.filter(id=self.kwargs.get('pk'))
+        else:
+            # Return all projects
+            project_id = self.kwargs['project_pk']
+            return Contributor.objects.filter(project = project_id)
+
     def list(self, request, *args, **kwargs):
-        project_id = self.request.resolver_match.kwargs.get('project_pk')
-        queryset = Contributor.objects.filter(project = project_id)
-        page = self.paginate_queryset(queryset)
+        page = self.paginate_queryset(self.get_queryset())
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
-        project_author = Project.objects.filter(author_user=self.request.user).count()
         serializer = self.get_serializer(data=request.data)
-        print(project_author)
         if serializer.is_valid():
             self.perform_create(serializer)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -184,25 +222,38 @@ class ContributorsViewset(ModelViewSet):
 class IssueViewset(ModelViewSet):
 
     # Serializer and queryset
-    queryset = Issue.objects.all()
     serializer_class = IssuesSerializer
     
     def get_permissions(self):
         """
         Instantiates and returns the list of permissions that this view requires.
         """
-        if self.action in ['list', 'retrieve', 'create',]:
-            permission_classes = [IsAuthenticated & (IsProjectAuthor | IsContributor)]
+        # safe method
+        if self.action in ['list', 'create']:
+            permission_classes = [IsAuthenticated & (IsContributor | IsProjectAuthor)]
+        # other method
+        elif self.action == 'retrieve':
+            permission_classes = [IsAuthenticated & IsValidePkIssue & (IsContributor | IsProjectAuthor)]
         elif self.action in ['update', 'partial_update', 'destroy']:
             permission_classes = [IsAuthenticated & IsIssueAuthor]
         else:
             permission_classes=[IsAuthenticated & IsAdminAuthenticated]
         return [permission() for permission in permission_classes]
 
+    def get_queryset(self):
+        """
+        Returns the queryset used for this view.
+        """
+        if self.action in ['retrieve', 'update', 'partial_update', 'destroy']:
+            return Issue.objects.filter(id=self.kwargs.get('pk'))
+        else:
+            # Return all projects
+            project_id = Issue.objects.filter(project=self.request.resolver_match.kwargs.get('project_pk'))
+            return project_id
+
     def list(self, request, *args, **kwargs):
-        project_id = self.request.resolver_match.kwargs.get('project_pk')
-        queryset = Issue.objects.filter(project__id = project_id).order_by('-created_time')
-        page = self.paginate_queryset(queryset)
+        page = self.paginate_queryset(self.get_queryset())
+        print(type(self.paginate_queryset(self.get_queryset())))
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
@@ -245,24 +296,36 @@ class CommentViewset(ModelViewSet):
 
     # Serializer and queryset
     serializer_class = CommentsSerializer
-    queryset = Comments.objects.all()
 
     def get_permissions(self):
         """
         Instantiates and returns the list of permissions that this view requires.
         """
-        if self.action in ['list', 'retrieve', 'create',]:
-            permission_classes = [IsAuthenticated & IsContributor]
-        elif self.action in ['update', 'partial_update', 'destroy']:
+        # safe method
+        if self.action == 'list':
+            permission_classes = [IsAuthenticated & ( IsProjectAuthor | IsContributor)]
+        # other
+        elif self.action == 'create':
+            permission_classes = [IsAuthenticated & ( IsProjectAuthor | IsContributor)]
+        elif self.action in ['retrieve', 'update', 'partial_update', 'destroy']:
             permission_classes = [IsAuthenticated & IsCommentAuthor]
         else:
             permission_classes=[IsAuthenticated & IsAdminAuthenticated]
         return [permission() for permission in permission_classes]
 
+    def get_queryset(self):
+        """
+        Returns the queryset used for this view.
+        """
+        if self.action in ['retrieve', 'update', 'partial_update', 'destroy']:
+            return Comments.objects.filter(id=self.kwargs.get('pk'))
+        else:
+            # Return all projects
+            issue_id = self.request.resolver_match.kwargs.get('issue_pk')
+            return Comments.objects.filter(issue__id = issue_id).order_by('-created_time')
+
     def list(self, request, *args, **kwargs):
-        issue_id = self.request.resolver_match.kwargs.get('issue_pk')
-        queryset = Comments.objects.filter(issue__id = issue_id).order_by('-created_time')
-        page = self.paginate_queryset(queryset)
+        page = self.paginate_queryset(self.get_queryset())
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)

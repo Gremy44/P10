@@ -60,12 +60,9 @@ class IssuesSerializer(ModelSerializer):
         'project_pk': 'project__pk',
     }
 
-    assignee_user = UserSerializer(required=False)
-    assignee_user_id = serializers.IntegerField(required=False)
-    
     class Meta:
         model = Issue
-        fields = ['id', 'title', 'desc', 'tag', 'priority', 'assignee_user','assignee_user_id', 'status', 'created_time']
+        fields = ['id', 'title', 'desc', 'project_id', 'tag', 'priority', 'assignee_user', 'status', 'created_time']
         
     def create(self, validated_data):
         project_id = self.context['view'].kwargs['project_pk']

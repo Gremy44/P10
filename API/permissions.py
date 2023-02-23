@@ -1,6 +1,7 @@
 from rest_framework import permissions
 from rest_framework.permissions import BasePermission
 from .models import Project, User, Issue, Comments, Contributor
+from django.db.models import Q
 import logging
  
 class IsAdminAuthenticated(BasePermission):
@@ -8,119 +9,74 @@ class IsAdminAuthenticated(BasePermission):
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_authenticated and request.user.is_superuser)
 
-'''class IsAuthorAuthenticated(BasePermission):
-
     def has_object_permission(self, request, view, obj):
-        return obj.author_user == request.user
-
-class IsAuthorOrContributorProject(BasePermission):
-    def has_permission(self, request, view):
-    
-        # check if author (=> 1 is author, => 0 isn't)
-        project = Project.objects.filter(author_user_id=request.user)
-
-        # sort un queryset de tous les projets ou l'user a été trouvé
-        is_contributor = Contributor.objects.filter(user_id=request.user)
-
-        return (bool(project.count()>0)) or (bool(is_contributor.count()>0))
-
-    def has_object_permission(self, request, view, obj):
-        is_contributor = Contributor.objects.filter(user=request.user, project=obj).count()
-        return (bool(request.user == obj.author_user)) or (bool(is_contributor > 0))
-
-class IsAuthorProject(BasePermission):
-    def has_object_permission(self, request, view, obj):
-        return (bool(request.user == obj.author_user))
-
-class IsAuthorProjectContributor(BasePermission):
-    def has_permission(self, request, view):
-        project_id = request.resolver_match.kwargs.get('project_pk')
-        project = Project.objects.get(pk=project_id)
-        if request.user == project.author_user:
-            is_author=True
-        else:
-            is_author=False
-        return is_author
-
-    def has_object_permission(self, request, view, obj):
-        project_id = request.resolver_match.kwargs.get('project_pk')
-        project = Project.objects.get(pk=project_id)
-
-        if request.user == project.author_user:
-            is_author=True
-        else:
-            is_author=False
-        return is_author
-
-class IsAuthorOrContributorContributor(BasePermission):
-    def has_permission(self, request, view):
-        project_id = request.resolver_match.kwargs.get('project_pk')
-        project = Project.objects.get(pk=project_id)
-        is_contributor = Contributor.objects.filter(user=request.user, project__id=project_id).count()
-        return (request.user == project.author_user) or (is_contributor > 0)
-
-class IsAuthorOrContributorIssue(BasePermission):
-    def has_permission(self, request, view):
-        project_id = request.resolver_match.kwargs.get('project_pk')
-        project = Project.objects.get(pk=project_id)
-        is_contributor = Contributor.objects.filter(user=request.user, project__id=project_id).count()
-        return (request.user == project.author_user) or (is_contributor > 0)
-
-    def has_object_permission(self, request, view, obj):
-        is_contributor = Contributor.objects.filter(user=request.user, project=obj.project).count()
-        return (request.user == obj.author_user) or (is_contributor > 0)
+        return self.has_permission(request, view)
 
 
-class IsAuthorIssue(BasePermission):
-    def has_object_permission(self, request, view, obj):
-        return (request.user == obj.author_user)
-
-# and obj.permission == 'authorized'
-# Seulement Création ou lecture pour les contributeurs sur les commentaires relatifs à un problème
-class IsAuthorComment(BasePermission):
-    def has_object_permission(self, request, view, obj):
-        return bool(request.user == obj.author_user)
-
-class IsAuthorOrContributorComment(BasePermission):
-    def has_permission(self, request, view):
-        project_id = request.resolver_match.kwargs.get('project_pk')
-        project = Project.objects.get(pk=project_id)
-        is_contributor = Contributor.objects.filter(user=request.user, project__id=project_id).count()
-        return (request.user == project.author_user) or (is_contributor > 0)
-
-    def has_object_permission(self, request, view, obj):
-        is_contributor = Contributor.objects.filter(user=request.user, project=obj.issue.project).count()
-        return (request.user == obj.author_user) or (is_contributor > 0)
-'''
-
-# -----------------------------
-# ---- FINISH PERMISSIONS -----
-# -----------------------------
 class IsProjectAuthor(BasePermission):
+
     def has_permission(self, request, view):
-        project = Project.objects.filter(author_user_id=request.user)
+        project_id = request.resolver_match.kwargs.get('project_pk')
+        if project_id == None:
+            project = Project.objects.filter(Q(author_user=request.user) & Q(id=pk))
+            print('is_autor_1 : ', bool(project.count()>0))
+            return bool(project.count()>0)
+        project = Project.objects.filter(Q(author_user=request.user) & Q(id=project_id))
+        print('is_autor_2 : ', bool(project.count()>0), ' --- author user : ', request.user.id, ' --- id : ', project_id, ' --- pk : ', request.resolver_match.kwargs.get('pk'))
         return bool(project.count()>0)
 
     def has_object_permission(self, request, view, obj):
-        return bool(request.user == obj.author_user)
-
+        return self.has_permission(request, view)
+    
+        
 class IsContributor(BasePermission):
-
     def has_permission(self, request, view):
-        project_id = request.resolver_match.kwargs.get('project_pk')
-        is_contributor = Contributor.objects.filter(user=request.user, project__id=project_id).count()
-        return bool(is_contributor > 0)
-
+        project_id= request.resolver_match.kwargs.get('project_pk')
+        is_contributor = Contributor.objects.filter(Q(user=request.user) & Q(project=project_id))
+        print('contributeur : ', request.resolver_match.kwargs)
+        print('content params : ', request.method)
+        return bool(is_contributor.count() > 0)
+        
     def has_object_permission(self, request, view, obj):
-        is_contributor = Contributor.objects.filter(user=request.user, project=obj.project).count()
-        return bool(is_contributor > 0)
+        is_contributor = Contributor.objects.filter(Q(user=request.user) & Q(project=obj.project_id))
+        print('coucou : ', dir(obj))
+        return bool(is_contributor.count() > 0)
+        
 
 class IsIssueAuthor(BasePermission):
+    def has_permission(self, request, view):
+        project_id= request.resolver_match.kwargs.get('project_pk')
+        author = Issue.objects.filter(Q(author_user=request.user) & Q(project=project_id))
+        print("author : ", request.data)
+        return bool(author.count()>0)
 
     def has_object_permission(self, request, view, obj):
         return (request.user == obj.author_user)
 
+
 class IsCommentAuthor(BasePermission):
     def has_object_permission(self, request, view, obj):
+        print(request.resolver_match.kwargs)
+        issue_id = request.resolver_match.kwargs.get('issue_id')
+        author = Comments.objects.filter(Q(author_user = request.user) & Q(issue_id=issue_id))
+        print("heheh")
+        return bool(author.count() > 0) 
+    
+    def has_object_permission(self, request, view, obj):
+        print("hahaha")
         return bool(request.user == obj.author_user)
+
+class IsValidePkContributor(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        pk_id = request.resolver_match.kwargs.get('pk')
+        project_id= request.resolver_match.kwargs.get('project_pk')
+        pk_ok = Contributor.objects.filter(Q(id = pk_id) & Q(project=project_id))
+        return bool(pk_ok.count())
+
+class IsValidePkIssue(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        pk_id = request.resolver_match.kwargs.get('pk')
+        project_id= request.resolver_match.kwargs.get('project_pk')
+        pk_ok = Issue.objects.filter(Q(id = pk_id) & Q(project=project_id))
+        return bool(pk_ok.count())
 
