@@ -1,0 +1,6 @@
+[flake8]
+exclude = p10env, 
+          API/migrations, 
+          ticket/admin,
+          authentication/migrations
+          SoftDesk/settings.py

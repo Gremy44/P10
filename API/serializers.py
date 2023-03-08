@@ -1,10 +1,11 @@
-from rest_framework.serializers import ModelSerializer
+from rest_framework.serializers import ModelSerializer,\
+    HyperlinkedModelSerializer
 from rest_framework import serializers
 from .models import Project, Contributor, Issue, Comments
 from authentication.models import User
 
 
-class ProjectSerializer(ModelSerializer):
+class ProjectSerializer(HyperlinkedModelSerializer):
     author_user_id = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
@@ -24,13 +25,14 @@ class ContributorSerializer(ModelSerializer):
     parent_lookup_kwargs = {
         'project_pk': 'project__pk',
     }
-    
+
     class Meta:
         model = Contributor
         fields = ['id', 'project', 'user', 'permission', 'role']
 
     def create(self, validated_data):
-        project_id = self.context['request'].parser_context['kwargs']['project_pk']
+        project_id = self.context['request'].\
+            parser_context['kwargs']['project_pk']
         validated_data['project'] = Project.objects.get(pk=project_id)
         return super().create(validated_data)
 
@@ -43,8 +45,9 @@ class IssuesSerializer(ModelSerializer):
 
     class Meta:
         model = Issue
-        fields = ['id', 'title', 'desc', 'project_id', 'tag', 'priority', 'assignee_user', 'status', 'created_time']
-        
+        fields = ['id', 'title', 'desc', 'project_id', 'tag',
+                  'priority', 'assignee_user', 'status', 'created_time']
+
     def create(self, validated_data):
         project_id = self.context['view'].kwargs['project_pk']
         project = Project.objects.get(pk=project_id)
@@ -65,8 +68,9 @@ class IssuesSerializer(ModelSerializer):
 
         return super().create(validated_data)
 
+
 class CommentsSerializer(ModelSerializer):
-    
+
     parent_lookup_kwargs = {
         'project_pk': 'issue__project__pk',
         'issue_pk': 'issue__pk',

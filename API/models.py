@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 
+
 class Contributor(models.Model):
 
     PERMISSION = (
@@ -8,8 +9,12 @@ class Contributor(models.Model):
         ('unauthorized', 'Unauthorized'),
     )
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='contributor_user')
-    project = models.ForeignKey('Project', on_delete=models.CASCADE, related_name='contributor_project')
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='contributor_user')
+    project = models.ForeignKey(
+        'Project', on_delete=models.CASCADE,
+        related_name='contributor_project')
     permission = models.CharField(max_length=15, choices=PERMISSION)
     role = models.CharField(max_length=50)
 
@@ -26,7 +31,8 @@ class Project(models.Model):
     title = models.CharField(max_length=50)
     description = models.CharField(max_length=500)
     type = models.CharField(max_length=15, choices=TYPE)
-    author_user= models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    author_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
     def __str__(self):
         return self.title
@@ -58,8 +64,12 @@ class Issue(models.Model):
     priority = models.CharField(max_length=6, choices=PRIORITY)
     project = models.ForeignKey('Project', on_delete=models.CASCADE)
     status = models.CharField(max_length=8, choices=STATUS)
-    author_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='issues_author_user')
-    assignee_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True, related_name='issues_assignee_user')
+    author_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='issues_author_user')
+    assignee_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True,
+        related_name='issues_assignee_user')
     created_time = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -68,7 +78,8 @@ class Issue(models.Model):
 
 class Comments(models.Model):
     description = models.CharField(max_length=500)
-    author_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    author_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     issue = models.ForeignKey('Issue', on_delete=models.CASCADE)
     created_time = models.DateTimeField(auto_now_add=True)
 
