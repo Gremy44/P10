@@ -33,6 +33,8 @@ class IsProjectAuthor(BasePermission):
         return bool(project.count() > 0)
 
     def has_object_permission(self, request, view, obj):
+        if isinstance(obj, Contributor):
+            return bool(request.user == obj.project.author_user)
         return bool(request.user == obj.author_user)
 
 
